@@ -1,14 +1,39 @@
-from flask import Flask, render_template
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from murf import Murf
+from dotenv import load_dotenv
+import os
 
-app = Flask(__name__)
+# Load environment variables from .env file
+load_dotenv()
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+# Get API key from environment
+MURF_API_KEY = os.getenv("MURF_API_KEY")
 
-@app.route('/api/hello')
-def api_hello():
-    return {"message": "Hello from Flask!"}
+# Initialize FastAPI app
+app = FastAPI()
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+# Initialize Murf client with API key
+client = Murf(api_key=MURF_API_KEY)
+
+# Define input model for POST request
+class TextInput(BaseModel):
+    text: str
+
+@app.post("/generate-tts")
+def generate_tts(input: TextInput):
+    if not MURF_API_KEY:
+        raise HTTPException(status_code=500, detail="Murf API key not found in environment.")
+
+    try:
+        # Generate TTS using Murf
+        response = client.text_to_speech.generate(
+            text=input.text,
+            voice_id="en-US-natalie"
+        )
+        
+        # Return audio file URL from response
+        return {"audio_url": response.audio_file}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
